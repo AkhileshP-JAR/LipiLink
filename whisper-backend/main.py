@@ -8,7 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # whisper library (openai-whisper)
 import whisper
+import shutil
 
+if not shutil.which("ffmpeg"):
+    print("CRITICAL ERROR: ffmpeg is not installed or not in PATH!")
+    print("Whisper cannot run without it.")
+else:
+    print(f"ffmpeg found at: {shutil.which('ffmpeg')}")
 # Configuration
 MODEL_SIZE = os.getenv("MODEL_SIZE", "base")  # tiny, base, small, medium, large
 # Comma-separated list for allowed origins; if not set, allow all (dev convenience)
@@ -23,14 +29,14 @@ else:
     # expect comma-separated origins in env var, e.g. "http://localhost:5173,http://127.0.0.1:5173"
     allow_origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
+    allow_origins=["*"],  # Allows all origins (good for development)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
-
 # Load the Whisper model once at startup
 print(f"Loading Whisper model '{MODEL_SIZE}' (this may take a while on first run)...")
 model = whisper.load_model(MODEL_SIZE)
