@@ -31,6 +31,9 @@ const Index = () => {
   const [voiceEditorOpen, setVoiceEditorOpen] = useState(false);
   const voiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // New State for Target Language
+  const [targetLangCode, setTargetLangCode] = useState<string>('hi'); 
+
   const originalIsHindi = /[\u0900-\u097F]/.test(originalText);
 
   // Simple name mapping rules
@@ -233,40 +236,41 @@ const Index = () => {
     setIsManualProcessing(true);
 
     try {
+      // Map lang code to full name for LLM
+      const langMap: Record<string, string> = {
+        'hi': 'Hindi', 'en': 'English', 'mr': 'Marathi', 'fr': 'French', 
+        'es': 'Spanish', 'de': 'German', 'ja': 'Japanese'
+      };
+      const targetLangName = langMap[targetLangCode] || 'English';
+
       if (/[\u0900-\u097F]/.test(text)) {
-        // CASE 1: HINDI INPUT -> Translate to English
+        // CASE 1: HINDI INPUT -> Translate to Selected Language
         console.log('[MANUAL] Processing as Hindi text');
         
-        // Use new LLM service to translate Hindi -> English
-        const data = await generateAudioFriendlyTranslation(text, 'English');
+        const data = await generateAudioFriendlyTranslation(text, targetLangName);
         
         console.log('[MANUAL] Result:', data);
-        setTargetText(data.translatedScript); // English Translation
-        
-        // For Hindi input, "Hinglish" (transliteration) is less relevant in output 
-        // unless we want Romanized English (which is just English).
-        // We'll leave it empty or set to same as English for now.
+        setTargetText(data.translatedScript); 
         setHinglishText(data.phoneticHinglish); 
 
       } else {
-        // CASE 2: ENGLISH INPUT -> Translate to Hindi (Main Feature)
+        // CASE 2: ENGLISH INPUT -> Translate to Selected Language
         console.log('[MANUAL] Processing as English text');
         
-        // 1. Detect Gender
         const detectedGender = await detectGenderAuto(text);
-        
-        // 2. Steer the prompt (Add "As a male/female" context)
         const steeredText = applyPromptSteering(normalizedOriginal, detectedGender);
         
-        // 3. Call LLM
-        const data = await generateAudioFriendlyTranslation(steeredText, 'Hindi');
+        const data = await generateAudioFriendlyTranslation(steeredText, targetLangName);
         
-        // 4. Cleanup (Remove "As a female..." if it leaked into translation)
-        const cleanHindi = stripGenderPrefixFromHindi(data.translatedScript, detectedGender);
+        // Only strip Hindi gender prefix if target is Hindi
+        let cleanText = data.translatedScript;
+        if (targetLangCode === 'hi') {
+            cleanText = stripGenderPrefixFromHindi(data.translatedScript, detectedGender);
+        }
         
         console.log('[MANUAL] Result:', data);
-        setTargetText(cleanHindi);       // Hindi Script
-        setHinglishText(data.phoneticHinglish); // Phonetic Hinglish
+        setTargetText(cleanText); 
+        setHinglishText(data.phoneticHinglish);
       }
     } catch (error) {
       console.error('[MANUAL] Error processing text:', error);
@@ -304,20 +308,30 @@ const Index = () => {
     setIsProcessing(true);
 
     try {
+      const langMap: Record<string, string> = {
+        'hi': 'Hindi', 'en': 'English', 'mr': 'Marathi', 'fr': 'French', 
+        'es': 'Spanish', 'de': 'German', 'ja': 'Japanese'
+      };
+      const targetLangName = langMap[targetLangCode] || 'English';
+
       if (/[\u0900-\u097F]/.test(text)) {
-        // Hindi Input -> English
-        const data = await generateAudioFriendlyTranslation(text, 'English');
+        // Hindi Input -> Selected Target
+        const data = await generateAudioFriendlyTranslation(text, targetLangName);
         setTargetText(data.translatedScript);
         setHinglishText(data.phoneticHinglish);
       } else {
-        // English Input -> Hindi (With Gender Context)
+        // English Input -> Selected Target
         const detectedGender = await detectGenderAuto(text);
         const steeredText = applyPromptSteering(normalizedOriginal, detectedGender);
         
-        const data = await generateAudioFriendlyTranslation(steeredText, 'Hindi');
-        const cleanHindi = stripGenderPrefixFromHindi(data.translatedScript, detectedGender);
+        const data = await generateAudioFriendlyTranslation(steeredText, targetLangName);
         
-        setTargetText(cleanHindi);
+        let cleanText = data.translatedScript;
+        if (targetLangCode === 'hi') {
+            cleanText = stripGenderPrefixFromHindi(data.translatedScript, detectedGender);
+        }
+        
+        setTargetText(cleanText);
         setHinglishText(data.phoneticHinglish);
       }
     } catch (error) {
@@ -386,8 +400,11 @@ const Index = () => {
                     onProcessing={(v)=>setIsProcessing(v)}
                     translatedText={targetText}
                     hinglishText={hinglishText}
-                    targetLanguage={originalIsHindi ? 'English' : 'Hindi'}
+                    targetLanguage={targetLangCode === 'hi' ? 'Hindi' : targetLangCode} // Display label
                     originalText={originalText}
+                    // Pass down Target Language Props
+                    targetLangCode={targetLangCode}
+                    setTargetLangCode={setTargetLangCode}
                   />
                   {/* Typed input alternative */}
                   <div className="mt-4 max-w-xl mx-auto">
@@ -480,7 +497,7 @@ const Index = () => {
               originalText={originalText}
               hinglishText={hinglishText}
               targetText={targetText}
-              targetLanguage={originalIsHindi ? 'English' : 'Hindi'}
+              targetLanguage={targetLangCode} // Pass the code or label
               debugMode={debugMode}
             />
             
@@ -488,7 +505,7 @@ const Index = () => {
               <TextToSpeech
                 hinglishText={hinglishText}
                 targetText={targetText}
-                targetLanguage={originalIsHindi ? 'English' : 'Hindi'}
+                targetLanguage={targetLangCode}
               />
             </div>
 

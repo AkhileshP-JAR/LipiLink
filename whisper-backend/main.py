@@ -2,23 +2,26 @@ import os
 import tempfile
 import traceback
 from typing import Optional
-
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
-# whisper library (openai-whisper)
-import whisper
 import shutil
 
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi.middleware.cors import CORSMiddleware
+
+# faster-whisper library (CTranslate2)
+from faster_whisper import WhisperModel
+
+# 1. FFmpeg Check (Crucial for Windows)
 if not shutil.which("ffmpeg"):
     print("CRITICAL ERROR: ffmpeg is not installed or not in PATH!")
     print("Whisper cannot run without it.")
 else:
     print(f"ffmpeg found at: {shutil.which('ffmpeg')}")
+
 # Configuration
 MODEL_SIZE = os.getenv("MODEL_SIZE", "base")  # tiny, base, small, medium, large
-# Comma-separated list for allowed origins; if not set, allow all (dev convenience)
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+
+SUPPORTED_LANGUAGES = {"en", "hi", "mr", "ta", "te", "ja"}
 
 app = FastAPI(title="Whisper Transcription API")
 
@@ -26,9 +29,7 @@ app = FastAPI(title="Whisper Transcription API")
 if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS:
     allow_origins = ["*"]
 else:
-    # expect comma-separated origins in env var, e.g. "http://localhost:5173,http://127.0.0.1:5173"
     allow_origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,10 +38,12 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-# Load the Whisper model once at startup
-print(f"Loading Whisper model '{MODEL_SIZE}' (this may take a while on first run)...")
-model = whisper.load_model(MODEL_SIZE)
-print("Whisper model loaded.")
+
+# Load the Faster-Whisper model once at startup
+print(f"Loading Faster-Whisper model '{MODEL_SIZE}' (this may take a while on first run)...")
+# Run on CPU by default for broader compatibility, use 'cuda' if GPU is guaranteed
+model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
+print("Faster-Whisper model loaded.")
 
 @app.get("/")
 async def root():
@@ -51,18 +54,20 @@ async def health():
     return {"status": "ok"}
 
 @app.post("/transcribe/")
-async def transcribe(file: UploadFile = File(...)):
+async def transcribe(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None), # <--- New: Accepts language code (e.g., 'hi', 'en')
+    prompt: Optional[str] = Form(None)    # <--- New: Accepts context prompt to fix hallucinations
+):
     """
     Accepts multipart file upload (field name 'file').
-    Returns JSON: {"transcript": "..."}
-    Notes:
-      - Whisper uses ffmpeg under the hood to read many formats (webm, mp3, wav, m4a, ...).
-      - Ensure ffmpeg is installed and on PATH on your machine.
+    Optional fields: 'language' (ISO code) and 'prompt' (string).
+    Returns JSON: {"transcript": "...", "detected_language": "..."}
     """
-    # Basic content-type allowance — accept audio files (loosely)
+    
+    # Basic content-type allowance
     content_type: Optional[str] = file.content_type
     if content_type and not content_type.startswith("audio"):
-        # still allow (server/ffmpeg can handle many), but warning
         print(f"Warning: uploaded content type is {content_type}")
 
     tmp_path = None
@@ -73,16 +78,47 @@ async def transcribe(file: UploadFile = File(...)):
             tmp.write(await file.read())
             tmp_path = tmp.name
 
-        # Run transcribe (blocking). Whisper will call ffmpeg internally to open the file.
+        # --- NEW LOGIC START ---
+        options = {}
+        
+        # 1. Apply Language if provided (and not 'auto')
+        if language and language != "auto":
+            if language not in SUPPORTED_LANGUAGES:
+                raise HTTPException(status_code=400, detail=f"Unsupported language code: {language}")
+            options["language"] = language
+            print(f"Processing with forced language: {language}")
+        
+        # 2. Apply Prompt if provided
+        if prompt:
+            options["initial_prompt"] = prompt
+            print(f"Processing with context prompt: {prompt[:50]}...")
+
+        # Run transcribe with these options
         try:
-            result = model.transcribe(tmp_path)
-            transcript = result.get("text", "")
+            # We unpack **options into the transcribe method
+            segments, info = model.transcribe(tmp_path, **options)
+            
+            # faster-whisper returns a generator, so we must iterate
+            text_segments = []
+            for segment in segments:
+                text_segments.append(segment.text)
+                
+            transcript = "".join(text_segments).strip()
+            detected_lang = info.language
+            
+            print(f"Success. Detected: {detected_lang}")
+
+            return {
+                "transcript": transcript,
+                "detected_language": detected_lang
+            }
+        # --- NEW LOGIC END ---
+
         except Exception as e:
             tb = traceback.format_exc()
             print("Transcription error:\n", tb)
             raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-        return {"transcript": transcript}
     finally:
         # Ensure temporary file is removed
         try:

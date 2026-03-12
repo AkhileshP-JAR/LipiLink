@@ -79,7 +79,7 @@ export const TranslationTestComponent: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto mt-8 shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-2xl">
-          🤖 LLM Translation & TTS Pipeline
+          𖥂 Translation & TTS Pipeline
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
