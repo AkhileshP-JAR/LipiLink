@@ -2,18 +2,22 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import * as Speech from 'expo-speech';
 import { Feather } from '@expo/vector-icons'; // Standard Icons
+import { Theme } from '../utils/theme';
 
 interface TextToSpeechProps {
   hinglishText?: string;
   targetText?: string;
   targetLanguage?: string; // e.g. 'hi', 'en', 'fr' or 'Hindi'
+  theme: Theme;
 }
 
 export default function TextToSpeech({
   hinglishText,
   targetText,
-  targetLanguage = 'hi'
+  targetLanguage = 'hi',
+  theme
 }: TextToSpeechProps) {
+  const styles = createStyles(theme);
   
   const [isPlayingTarget, setIsPlayingTarget] = useState(false);
   const [isPlayingHinglish, setIsPlayingHinglish] = useState(false);
@@ -83,7 +87,7 @@ export default function TextToSpeech({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Feather name="volume-2" size={20} color="#2563eb" />
+        <Feather name="volume-2" size={20} color={theme.primary} />
         <Text style={styles.headerTitle}>Audio Playback</Text>
       </View>
 
@@ -144,10 +148,10 @@ export default function TextToSpeech({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    backgroundColor: theme.cardBg,
+    borderRadius: 16,
     padding: 16,
     width: '100%',
     elevation: 2, // Android shadow
@@ -157,21 +161,21 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     marginTop: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: theme.border,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: theme.border,
     paddingBottom: 12,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-    color: '#1f2937',
+    color: theme.text,
   },
   content: {
     gap: 16,
@@ -182,29 +186,29 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4b5563',
+    color: theme.textSecondary,
     marginBottom: 4,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
     gap: 8,
   },
   playBtn: {
-    backgroundColor: '#2563eb', // Blue
+    backgroundColor: theme.primary, // Blue
   },
   stopBtn: {
-    backgroundColor: '#fee2e2', // Light Red
+    backgroundColor: theme.dangerBg, // Light Red
     borderWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: theme.dangerBorder,
   },
   secondaryBtn: {
-    backgroundColor: '#f3f4f6', // Gray
+    backgroundColor: theme.tabBg, // Gray
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
   btnText: {
     color: '#fff',
@@ -212,10 +216,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   stopBtnText: {
-    color: '#ef4444', // Red text
+    color: theme.dangerText, // Red text
   },
   secondaryBtnText: {
-    color: '#374151',
+    color: theme.text,
     fontWeight: '600',
     fontSize: 14,
   }

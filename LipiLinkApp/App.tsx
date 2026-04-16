@@ -17,18 +17,24 @@ import { Feather } from '@expo/vector-icons';
 import AudioRecorder from './components/AudioRecorder';
 import TextToSpeech from './components/TextToSpeech';
 
-// Logic
+// Logic & Theme
 import { generateAudioFriendlyTranslation } from './utils/llmService';
+import { lightTheme, darkTheme, Theme } from './utils/theme';
 
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState<'voice' | 'manual'>('voice');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
   const [originalText, setOriginalText] = useState('');
   const [hinglishText, setHinglishText] = useState('');
   const [targetText, setTargetText] = useState('');
   const [targetLangCode, setTargetLangCode] = useState<string>('hi');
   const [isProcessing, setIsProcessing] = useState(false);
   const [manualInput, setManualInput] = useState('');
+
+  const theme = isDarkMode ? darkTheme : lightTheme;
+  const styles = createStyles(theme);
 
   // --- LOGIC: HELPER FUNCTIONS (Ported from Web) ---
   const NAME_PREFERRED: Record<string, string> = { 'schloke': 'Shlok' };
@@ -139,14 +145,22 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
       
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Feather name="mic" size={24} color="white" />
+        <View style={styles.logoAndTitle}>
+          <View style={styles.logoContainer}>
+            <Feather name="mic" size={24} color="white" />
+          </View>
+          <Text style={styles.headerTitle}>VoiceScript</Text>
         </View>
-        <Text style={styles.headerTitle}>VoiceScript</Text>
+        <TouchableOpacity 
+          onPress={() => setIsDarkMode(!isDarkMode)} 
+          style={styles.themeToggle}
+        >
+          <Feather name={isDarkMode ? "sun" : "moon"} size={22} color={theme.text} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -178,6 +192,7 @@ export default function App() {
               onTranscription={(text) => processText(text)}
               targetLangCode={targetLangCode}
               setTargetLangCode={setTargetLangCode}
+              theme={theme}
             />
           ) : (
             <View style={styles.manualCard}>
@@ -206,7 +221,7 @@ export default function App() {
           {/* LOADING STATE */}
           {isProcessing && activeTab === 'voice' && (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#2563eb" />
+              <ActivityIndicator size="large" color={theme.loader} />
               <Text style={styles.loaderText}>Processing...</Text>
             </View>
           )}
@@ -250,6 +265,7 @@ export default function App() {
               targetText={targetText}
               hinglishText={hinglishText}
               targetLanguage={targetLangCode}
+              theme={theme}
             />
 
           </View>
@@ -260,25 +276,40 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f9fafb', // gray-50
+    backgroundColor: theme.background,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: theme.cardBg,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    zIndex: 10,
+  },
+  logoAndTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  themeToggle: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: theme.background,
   },
   logoContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2563eb', // primary blue
+    borderRadius: 12,
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -286,7 +317,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: theme.text,
   },
   scrollContent: {
     padding: 16,
@@ -294,8 +325,8 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#e5e7eb',
-    borderRadius: 8,
+    backgroundColor: theme.tabBg,
+    borderRadius: 12,
     padding: 4,
     marginBottom: 20,
   },
@@ -304,57 +335,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
     gap: 8,
   },
   activeTab: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.cardBg,
     elevation: 2,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
   },
   tabText: {
     fontWeight: '600',
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   activeTabText: {
-    color: '#2563eb',
+    color: theme.primary,
   },
   contentArea: {
     marginBottom: 24,
   },
   manualCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBg,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
+    borderColor: theme.border,
+    borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    minHeight: 100,
+    minHeight: 120,
     textAlignVertical: 'top',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
+    color: theme.text,
   },
   processBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 12,
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
   },
   processBtnText: {
     color: 'white',
@@ -369,22 +406,27 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loaderText: {
-    color: '#6b7280',
+    color: theme.textSecondary,
     fontSize: 14,
   },
   resultsContainer: {
     gap: 16,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.cardBg,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   primaryCard: {
-    borderColor: '#bfdbfe', // blue-200
-    backgroundColor: '#eff6ff', // blue-50
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryBg,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -394,18 +436,18 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#9ca3af', // gray-400
+    color: theme.textMuted,
     marginBottom: 6,
     textTransform: 'uppercase',
   },
   cardText: {
     fontSize: 16,
-    color: '#1f2937',
+    color: theme.text,
     lineHeight: 24,
   },
   cardTextBig: {
     fontSize: 18,
-    color: '#1f2937',
+    color: theme.text,
     fontWeight: '500',
     lineHeight: 28,
   },

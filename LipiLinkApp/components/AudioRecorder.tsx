@@ -4,21 +4,27 @@ import { Audio } from 'expo-av';
 import { Picker } from '@react-native-picker/picker'; // Mobile Dropdown
 import { Feather, MaterialIcons } from '@expo/vector-icons'; // Standard Icons for Expo
 import { SUPPORTED_LANGUAGES, LanguageCode } from '../constants/languages';
+import { Theme } from '../utils/theme';
 
 // ⚠️ IMPORTANT: Replace with your PC's IP Address (e.g., 192.168.1.5)
-const BACKEND_URL = 'http://192.168.0.105:8097';
+const BACKEND_URL = 'http://192.168.33.69:8097';
+
+// const BACKEND_URL = 'http://192.168.0.105:8097';
 
 interface AudioRecorderProps {
   onTranscription: (text: string) => void;
   targetLangCode: string;
   setTargetLangCode: (code: string) => void;
+  theme: Theme;
 }
 
 export default function AudioRecorder({
   onTranscription,
   targetLangCode,
-  setTargetLangCode
+  setTargetLangCode,
+  theme
 }: AudioRecorderProps) {
+  const styles = createStyles(theme);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -140,7 +146,7 @@ export default function AudioRecorder({
         {/* Input Language */}
         <View style={styles.selectorBox}>
           <View style={styles.labelRow}>
-            <Feather name="globe" size={12} color="#666" />
+            <Feather name="globe" size={12} color={theme.textSecondary} />
             <Text style={styles.labelText}>Input</Text>
           </View>
           <Picker
@@ -157,14 +163,14 @@ export default function AudioRecorder({
 
         {/* Swap Button */}
         <TouchableOpacity style={styles.swapButton} onPress={swapLanguages}>
-          <MaterialIcons name="swap-horiz" size={24} color="#3b82f6" />
+          <MaterialIcons name="swap-horiz" size={24} color={theme.primary} />
         </TouchableOpacity>
 
         {/* Target Language */}
         <View style={[styles.selectorBox, styles.targetBox]}>
           <View style={styles.labelRow}>
-            <Feather name="arrow-right" size={12} color="#2563eb" />
-            <Text style={[styles.labelText, { color: '#2563eb' }]}>Target</Text>
+            <Feather name="arrow-right" size={12} color={theme.primary} />
+            <Text style={[styles.labelText, { color: theme.primary }]}>Target</Text>
           </View>
           <Picker
             selectedValue={targetLangCode}
@@ -217,7 +223,7 @@ export default function AudioRecorder({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     width: '100%',
     alignItems: 'center',
@@ -231,42 +237,43 @@ const styles = StyleSheet.create({
   },
   selectorBox: {
     flex: 1,
-    backgroundColor: '#f3f4f6', // muted/40
-    borderRadius: 8,
+    backgroundColor: theme.tabBg, // muted/40
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     overflow: 'hidden', // Ensures picker stays inside border
   },
   targetBox: {
-    backgroundColor: '#eff6ff', // primary/10
-    borderColor: '#bfdbfe',
+    backgroundColor: theme.primaryBg, // primary/10
+    borderColor: theme.primaryBorder,
   },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingTop: 6,
+    paddingHorizontal: 10,
+    paddingTop: 8,
   },
   labelText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#6b7280',
+    color: theme.textSecondary,
     textTransform: 'uppercase',
   },
   picker: {
     width: '100%',
-    height: 40, // Height for Android
-    marginTop: -8, // Pull picker up closer to label
+    height: 48, // Height for Android
+    marginTop: -4, // Pull picker up closer to label
+    color: theme.text,
   },
   swapButton: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: 8,
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.primaryBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: theme.primaryBorder,
   },
   recordContainer: {
     position: 'relative',
@@ -281,15 +288,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     zIndex: 2,
   },
   defaultBtn: {
-    backgroundColor: '#3b82f6', // Blue
+    backgroundColor: theme.primary, // Blue
   },
   recordingBtn: {
-    backgroundColor: '#ef4444', // Red
+    backgroundColor: theme.dangerText, // Red
   },
   btnText: {
     color: 'white',
@@ -299,15 +306,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   statusText: {
-    color: '#6b7280',
-    fontSize: 14,
+    color: theme.textSecondary,
+    fontSize: 15,
+    fontWeight: '500',
   },
   pulseRing: {
     position: 'absolute',
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(239, 68, 68, 0.3)', // Red opacity
+    backgroundColor: theme.dangerBg, // Red opacity
     zIndex: 1,
   },
 });
