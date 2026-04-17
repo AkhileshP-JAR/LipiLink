@@ -3,3 +3,9 @@ uvicorn
 faster-whisper
 pydub
 python-multipart
+torch 
+torchaudio 
+transformers 
+soundfile 
+librosa
+huggingface_hub

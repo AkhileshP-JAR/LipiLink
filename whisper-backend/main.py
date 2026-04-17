@@ -1,4 +1,9 @@
 import os
+
+# Fix for Windows OS: Prevents HuggingFace from crashing due to Symlink Privileges (WinError 1314)
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
+
 import tempfile
 import traceback
 from typing import Optional
@@ -7,8 +12,10 @@ import shutil
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 
-# faster-whisper library (CTranslate2)
 from faster_whisper import WhisperModel
+from transformers import AutoModel
+import torch
+import librosa
 
 # 1. FFmpeg Check (Crucial for Windows)
 if not shutil.which("ffmpeg"):
@@ -20,10 +27,9 @@ else:
 # Configuration
 MODEL_SIZE = os.getenv("MODEL_SIZE", "base")  # tiny, base, small, medium, large
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+SUPPORTED_LANGUAGES = {"en", "hi", "mr", "ta", "te", "gu", "bn", "ja"}
 
-SUPPORTED_LANGUAGES = {"en", "hi", "mr", "ta", "te", "ja"}
-
-app = FastAPI(title="Whisper Transcription API")
+app = FastAPI(title="Transcription API (Smart Router)")
 
 # CORS configuration
 if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS:
@@ -33,21 +39,53 @@ else:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (good for development)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Load the Faster-Whisper model once at startup
-print(f"Loading Faster-Whisper model '{MODEL_SIZE}' (this may take a while on first run)...")
-# Run on CPU by default for broader compatibility, use 'cuda' if GPU is guaranteed
-model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
+# ---------------------------------------------------------
+# LOAD MODELS ON STARTUP
+# ---------------------------------------------------------
+print(f"Loading Faster-Whisper model '{MODEL_SIZE}'...")
+whisper_model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
 print("Faster-Whisper model loaded.")
 
+AI4BHARAT_MODEL_NAME = "ai4bharat/indic-conformer-600m-multilingual"
+print(f"Loading AI4Bharat model '{AI4BHARAT_MODEL_NAME}' (Will require trust_remote_code)...")
+# Custom Conformer model loading natively processes audio without external processors
+ai4bharat_model = AutoModel.from_pretrained(AI4BHARAT_MODEL_NAME, trust_remote_code=True)
+ai4bharat_model.eval()
+print("AI4Bharat model loaded.")
+
+# ---------------------------------------------------------
+# AI4BHARAT HELPERS (Using Librosa to bypass torchaudio crash)
+# ---------------------------------------------------------
+def load_audio(path):
+    # librosa automatically handles mono conversion and 16000Hz resampling
+    speech_array, _ = librosa.load(path, sr=16000, mono=True)
+    # The conformer model expects shape (1, num_samples)
+    return torch.from_numpy(speech_array).unsqueeze(0)
+
+def transcribe_ai4bharat(path, lang_code):
+    wav = load_audio(path)
+    
+    # Use the custom inference method exposed by indic-conformer
+    # You can change "ctc" to "rnnt" for better accuracy if preferred
+    with torch.no_grad():
+        transcription = ai4bharat_model(wav, lang_code, "ctc")
+        
+    # the model returns a list of texts for batches: ['transcript']
+    temp_text = transcription[0] if isinstance(transcription, list) else str(transcription)
+    return temp_text.replace("  ", " ").strip()
+
+# ---------------------------------------------------------
+# ENDPOINTS
+# ---------------------------------------------------------
 @app.get("/")
 async def root():
-    return {"status": "ok", "model": MODEL_SIZE}
+    return {"status": "ok", "whisper_model": MODEL_SIZE, "indic_model": AI4BHARAT_MODEL_NAME}
 
 @app.get("/health")
 async def health():
@@ -56,71 +94,70 @@ async def health():
 @app.post("/transcribe/")
 async def transcribe(
     file: UploadFile = File(...),
-    language: Optional[str] = Form(None), # <--- New: Accepts language code (e.g., 'hi', 'en')
-    prompt: Optional[str] = Form(None)    # <--- New: Accepts context prompt to fix hallucinations
+    language: Optional[str] = Form(None),
+    prompt: Optional[str] = Form(None)
 ):
     """
-    Accepts multipart file upload (field name 'file').
-    Optional fields: 'language' (ISO code) and 'prompt' (string).
-    Returns JSON: {"transcript": "...", "detected_language": "..."}
+    Smart Router: 
+    - Hindi, English, Japanese, auto -> Whisper
+    - Marathi, Tamil, Telugu, Gujarati, Bengali -> AI4Bharat
     """
-    
-    # Basic content-type allowance
     content_type: Optional[str] = file.content_type
     if content_type and not content_type.startswith("audio"):
         print(f"Warning: uploaded content type is {content_type}")
 
     tmp_path = None
     try:
-        # Save uploaded file to a temporary file
         suffix = os.path.splitext(file.filename or "")[1] or ".wav"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(await file.read())
             tmp_path = tmp.name
 
-        # --- NEW LOGIC START ---
-        options = {}
-        
-        # 1. Apply Language if provided (and not 'auto')
+        # Smart Routing Logic
         if language and language != "auto":
             if language not in SUPPORTED_LANGUAGES:
                 raise HTTPException(status_code=400, detail=f"Unsupported language code: {language}")
-            options["language"] = language
-            print(f"Processing with forced language: {language}")
-        
-        # 2. Apply Prompt if provided
-        if prompt:
-            options["initial_prompt"] = prompt
-            print(f"Processing with context prompt: {prompt[:50]}...")
 
-        # Run transcribe with these options
-        try:
-            # We unpack **options into the transcribe method
-            segments, info = model.transcribe(tmp_path, **options)
+        # Choose Engine
+        use_whisper = (language in ["hi", "en", "ja", "auto", None])
+        
+        if use_whisper:
+            options = {}
+            if language and language != "auto":
+                options["language"] = language
+            if prompt:
+                options["initial_prompt"] = prompt
+                
+            print(f"Routing to Faster-Whisper (Lang: {language})")
+            segments, info = whisper_model.transcribe(tmp_path, **options)
             
-            # faster-whisper returns a generator, so we must iterate
             text_segments = []
             for segment in segments:
                 text_segments.append(segment.text)
                 
             transcript = "".join(text_segments).strip()
             detected_lang = info.language
-            
-            print(f"Success. Detected: {detected_lang}")
+            engine = "faster-whisper"
+        else:
+            print(f"Routing to AI4Bharat (Lang: {language})")
+            transcript = transcribe_ai4bharat(tmp_path, language)
+            detected_lang = language
+            engine = "ai4bharat"
 
-            return {
-                "transcript": transcript,
-                "detected_language": detected_lang
-            }
-        # --- NEW LOGIC END ---
+        print(f"Success. Engine: {engine}, Detected/Routed: {detected_lang}")
 
-        except Exception as e:
-            tb = traceback.format_exc()
-            print("Transcription error:\n", tb)
-            raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        return {
+            "transcript": transcript,
+            "detected_language": detected_lang,
+            "engine": engine
+        }
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        print("Transcription error:\n", tb)
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
     finally:
-        # Ensure temporary file is removed
         try:
             if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)

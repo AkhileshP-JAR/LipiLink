@@ -7,9 +7,9 @@ import { SUPPORTED_LANGUAGES, LanguageCode } from '../constants/languages';
 import { Theme } from '../utils/theme';
 
 // ⚠️ IMPORTANT: Replace with your PC's IP Address (e.g., 192.168.1.5)
-const BACKEND_URL = 'http://192.168.33.69:8097';
+// const BACKEND_URL = 'http://192.168.33.69:8097';
 
-// const BACKEND_URL = 'http://192.168.0.105:8097';
+const BACKEND_URL = 'http://192.168.0.103:8097';
 
 interface AudioRecorderProps {
   onTranscription: (text: string) => void;
@@ -106,13 +106,24 @@ export default function AudioRecorder({
       // 1. Pass Input Language
       formData.append('language', inputLanguage);
 
-      // 2. Add Context Prompts (Logic ported from your Web App)
+      // 2. Add Context Prompts (Only use Native Script for the target language!)
+      // Passing English words into a Marathi/Hindi prompt forces Whisper to hallucinate English outputs.
       if (inputLanguage === 'hi') {
-        formData.append('prompt', "This is a Hindi conversation. Transcribe accurately in Devanagari.");
+        formData.append('prompt', "नमस्ते, यह एक हिंदी वार्तालाप है।");
       } else if (inputLanguage === 'mr') {
-        formData.append('prompt', "This is a Marathi conversation. Transcribe accurately.");
-      } else if (inputLanguage === 'auto') {
-        formData.append('prompt', "Start of transcript. This is a clear audio recording.");
+        formData.append('prompt', "नमस्कार, हा मराठी संवाद आहे.");
+      } else if (inputLanguage === 'ta') {
+        formData.append('prompt', "வணக்கம், இது ஒரு தமிழ் உரையாடல்.");
+      } else if (inputLanguage === 'te') {
+        formData.append('prompt', "నమస్కారం, ఇది తెలుగు సంభాషణ.");
+      } else if (inputLanguage === 'gu') {
+        formData.append('prompt', "નમસ્તે, આ એક ગુજરાતી વાતચીત છે.");
+      } else if (inputLanguage === 'bn') {
+        formData.append('prompt', "নমস্কার, এটি একটি বাংলা কথোপকথন।");
+      } else if (inputLanguage === 'ja') {
+        formData.append('prompt', "こんにちは、これは日本語の会話です。");
+      } else if (inputLanguage === 'en') {
+        formData.append('prompt', "Hello, this is a clear English conversation.");
       }
 
       const response = await fetch(`${BACKEND_URL}/transcribe/`, {

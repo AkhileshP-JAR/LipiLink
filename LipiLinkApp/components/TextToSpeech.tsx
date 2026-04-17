@@ -32,6 +32,8 @@ export default function TextToSpeech({
     if (l === 'mr' || l.includes('marathi')) return 'mr-IN'; 
     if (l === 'te' || l.includes('telugu')) return 'te-IN';
     if (l === 'ta' || l.includes('tamil')) return 'ta-IN';
+    if (l === 'gu' || l.includes('gujarati')) return 'gu-IN';
+    if (l === 'bn' || l.includes('bengali')) return 'bn-IN';
     if (l === 'en' || l.includes('english')) return 'en-IN'; // Indian English
     if (l === 'ja' || l.includes('japanese')) return 'ja-JP';
     
@@ -61,10 +63,9 @@ export default function TextToSpeech({
           if (code === 'mr-IN') {
              console.log("Falling back from Marathi to Hindi for Devnagari script...");
              attemptSpeech('hi-IN');
-          } else if (code === 'ta-IN' || code === 'te-IN') {
-             // For Tamil/Telugu, Hindi TTS won't work well because the script is entirely different.
-             // We fallback to Indian English, which often has phonetic rules built-in for Dravidian names.
-             console.log(`Falling back from ${code} to en-IN...`);
+          } else if (code === 'ta-IN' || code === 'te-IN' || code === 'gu-IN' || code === 'bn-IN') {
+             // We fallback to Indian English, which often has phonetic rules built-in for regional Indian languages.
+             console.log(`Falling back from ${code} to en-IN due to missing voice pack...`);
              attemptSpeech('en-IN');
           } else {
              setLocalPlayingState(false);

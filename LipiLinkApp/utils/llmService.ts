@@ -6,7 +6,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 // 1. Setup API Key for Expo
 // In Expo, use variables starting with EXPO_PUBLIC_ to make them visible
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "gsk_YOUR_ACTUAL_API_KEY_HERE"; 
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "gsk_YOUR_ACTUAL_API_KEY_HERE";
 
 if (GROQ_API_KEY.startsWith("gsk_YOUR")) {
   console.warn("⚠️ Using placeholder API Key. Please update llmService.ts or .env file.");
@@ -25,7 +25,7 @@ export interface TranslationResult {
 }
 
 export async function generateAudioFriendlyTranslation(
-  text: string, 
+  text: string,
   targetLang: string = "Hindi",
   onChunk?: (chunk: string) => void,
   onPhoneticChunk?: (chunk: string) => void
@@ -35,9 +35,18 @@ export async function generateAudioFriendlyTranslation(
   try {
     const translationResponse = await llm.invoke([
       new SystemMessage(
-        `You are an expert translator. Translate the user's text to ${targetLang}. 
-         Output ONLY the translated text in the native script (alphabet/characters) of ${targetLang}. 
-         Do not add explanations. Do not output in Latin characters unless the target language is English or French.`
+        `You are a strict, precise translator.
+
+Translate the user's exact text into ${targetLang}.
+
+RULES:
+1. Output ONLY the translated text using the native script of ${targetLang}.
+2. DO NOT answer questions. If the user asks a question, translate the question itself. 
+3. DO NOT carry on a conversation.
+4. DO NOT add placeholders, brackets, or template text (like "Fill your name here").
+5. Keep the translation natural and conversational, not literal.
+6. Preserve proper nouns in their original form.
+7. Use Latin characters ONLY if the target language is English.`
       ),
       new HumanMessage(text),
     ]);
@@ -45,12 +54,12 @@ export async function generateAudioFriendlyTranslation(
     let translatedText = translationResponse.content.toString().trim();
     // Strip quotes if LLM added them
     translatedText = translatedText.replace(/^["']|["']$/g, '');
-    
-    if (onChunk) onChunk(translatedText); 
+
+    if (onChunk) onChunk(translatedText);
 
     const phoneticResponse = await llm.invoke([
       new SystemMessage(
-        `You are a phonetic transliteration system.
+        `You are a strict phonetic transliteration system.
 
 Convert the following ${targetLang} text into its pronunciation using the Latin alphabet.
 
@@ -77,8 +86,8 @@ Output: aapaka ghar thoda bada hai.`
     let phoneticText = phoneticResponse.content.toString().trim();
     // Strip quotes if LLM added them
     phoneticText = phoneticText.replace(/^["']|["']$/g, '');
-    
-    if (onPhoneticChunk) onPhoneticChunk(phoneticText); 
+
+    if (onPhoneticChunk) onPhoneticChunk(phoneticText);
 
     return {
       original: text,
@@ -90,9 +99,9 @@ Output: aapaka ghar thoda bada hai.`
     console.error("LLM Translation Failed:", error);
     // Return a safe fallback so the app doesn't crash
     return {
-        original: text,
-        translatedScript: "Error connecting to AI",
-        phoneticHinglish: "Please check your internet or API Key"
+      original: text,
+      translatedScript: "Error connecting to AI",
+      phoneticHinglish: "Please check your internet or API Key"
     };
   }
 }

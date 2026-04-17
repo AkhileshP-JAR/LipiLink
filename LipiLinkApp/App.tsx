@@ -111,7 +111,7 @@ export default function App() {
       
       const langMap: Record<string, string> = {
         'hi': 'Hindi', 'en': 'English', 'mr': 'Marathi',  'ja': 'Japanese',
-        'ta': 'Tamil', 'te': 'Telugu'
+        'ta': 'Tamil', 'te': 'Telugu', 'gu': 'Gujarati', 'bn': 'Bengali'
       };
       const targetLangName = langMap[targetLangCode] || 'English';
 
